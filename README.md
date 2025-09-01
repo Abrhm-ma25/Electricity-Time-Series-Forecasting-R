@@ -15,7 +15,8 @@ This project aims to **forecast electricity consumption** on the day of **2010-0
 ## Data
 
 **Snapshot of dataset:**  
-![Elec_Train_Dataset](./images/Elec_Train_Dataset.png)  
+
+![Elec_Train_Dataset](./Images/Elec_Train_Dataset.png)  
 
 **Index:**
 - `Timestamp`: Date-time of measurement
@@ -37,9 +38,8 @@ This project aims to **forecast electricity consumption** on the day of **2010-0
 ---
 
 ### 2. Exploration & Visualization
-
-**Average Daily Consumption Profile:**  
-![Average Daily Profile](./images/avg_daily_profile.png)  
+ 
+![Average Daily Profile](./Images/avg_daily_profile.png)  
 
 **Interpretation:**
 - Baseload overnight (~150 kW)
@@ -48,8 +48,8 @@ This project aims to **forecast electricity consumption** on the day of **2010-0
 - Evening peak (>300 kW)
 - Evening gradually drops back to the baseload
 
-**Full Historical Consumption:**  
-![Full Historical](./images/full_history.png)  
+
+![Full Historical](./Images/full_history.png)  
 
 **Interpretation:**
 -The graph presents a daily seasonality with one unexpected drop on 18 february.
@@ -93,9 +93,9 @@ Useful to compare models with different numbers of parameters, especially for la
 
 
 **Key Insights:**
-- Baseline models have modest performance.
-- Statistical models show improved accuracy.
-- NNETAR with temperature has the best performance (lowest RMSE).
+- Baseline models have modest performances.
+- Statistical models show improvement of the accuracy.
+- NNETAR + temperature has the best performance (lowest RMSE).
 - XGBoost also outperforms most classical models (Baseline and Statistical).
 
 ---
@@ -103,7 +103,9 @@ Useful to compare models with different numbers of parameters, especially for la
 ### 5. Side-by-Side Forecast Visualization
 
 **Comparison of the 4 Best Models:**  
-![Forecast Comparison](./images/forecast_comparison.png)
+
+
+![Forecast Comparison](./Images/forecast_comparison.png)
 
 
 ---
