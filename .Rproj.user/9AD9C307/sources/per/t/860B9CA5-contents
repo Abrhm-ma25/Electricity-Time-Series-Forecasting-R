@@ -1,0 +1,281 @@
+# Title: "Electricity Consumption Time Series Analysis and Forecasting" - author: "Abraham Ibitowa"
+
+library(readxl)
+library(dplyr)
+library(lubridate)
+library(stringr)
+library(zoo)
+library(ggplot2)
+library(tseries)
+library(forecast)
+library(car)
+library(writexl)
+
+
+## 1. Data Import and Preprocessing
+
+data_path <- "data/2025-06-Elec-train.xlsx"
+df <- read_excel(data_path)
+  
+ # Rename columns
+  df <- df %>%
+    rename(
+      timestamp = `Timestamp`,
+      power_kw  = `Power (kW)`,
+      temp_c    = `Temp (C°)`
+    )
+  
+  # Convert timestamps (numeric or string)
+  df <- df %>%
+    mutate(timestamp = case_when(
+      str_detect(as.character(timestamp), "^[0-9]+(\\.[0-9]+)?$") ~ 
+        as_datetime((as.numeric(timestamp) - 25569) * 86400, tz = "UTC"),
+      TRUE ~ as.POSIXct(timestamp, format = "%m/%d/%Y %H:%M", tz = "UTC")
+    )) %>%
+    arrange(timestamp)
+  
+  # Report missing
+  message("Missing timestamp: ", sum(is.na(df$timestamp)))
+  message("Missing power_kw: ", sum(is.na(df$power_kw)))
+  message("Missing temp_c: ", sum(is.na(df$temp_c)))
+  
+## 2. Feature Engineering
+  
+  df <- df %>%
+    mutate(
+      month        = month(timestamp, label = TRUE, abbr = FALSE),  # e.g. "February"
+      day_of_month = day(timestamp),                                # 1 to 31
+      day_month    = format(timestamp, "%d/%m"),                    # e.g. "01/02"
+      week         = week(timestamp)
+    )
+  
+## 3 Create the time series object
+  # Remove any NA values for creation of full time series
+  df_ts <- df %>% filter(!is.na(power_kw))
+  ts_power <- ts(
+    df_ts$power_kw,
+    frequency = 96,
+    start = c(year(min(df_ts$timestamp)), 1)
+  )
+  
+
+## 4. Exploratory Data Visualization
+
+  df_plot <- df %>%
+    filter(!is.na(power_kw))
+  
+  # Basic time series line plot of power over time (timestamp)
+  p1 <- ggplot(df_plot, aes(x = timestamp, y = power_kw)) +
+    geom_line(color = "steelblue") +
+    labs(title = "Electricity Load over Time",
+         x = "Date Time",
+         y = "Power (kW)") +
+    theme_minimal()
+  
+  print(p1)
+  
+  # Aggregate average power by week number
+  df_weekly <- df_plot %>%
+    group_by(week) %>%
+    summarise(avg_power = mean(power_kw, na.rm = TRUE)) %>%
+    ungroup()
+  
+  # Plot average power by week number
+  p2_week <- ggplot(df_weekly, aes(x = week, y = avg_power)) +
+    geom_line(color = "darkorange") +
+    geom_point(color = "darkorange") +
+    labs(title = "Average Electricity Load by Week Number",
+         x = "Week of the Year",
+         y = "Average Power (kW)") +
+    theme_minimal() +
+    scale_x_continuous(breaks = seq(1, 53, by = 2))  # Show breaks every 2 weeks for readability
+  
+  print(p2_week)
+
+  
+  # Another example: Boxplot of load by month to visualize distribution across months
+  
+  p3 <- ggplot(df_plot, aes(x = month, y = power_kw)) +
+    geom_boxplot(fill = "lightgreen") +
+    labs(title = "Distribution of Electricity Load by Month",
+         x = "Month",
+         y = "Power (kW)") +
+    theme_minimal()
+  
+  print(p3)
+  
+
+## 5. Stationarity Tests
+
+  message("=== Augmented Dickey-Fuller Test ===")
+  print(adf.test(ts_power))
+  message("=== KPSS Test ===")
+  print(kpss.test(ts_power))
+  
+
+## 6. Autocorrelation Analysis
+
+
+  acf(ts_power, main = "ACF: Electricity Load")
+  pacf(ts_power, main = "PACF: Electricity Load")
+
+
+## 7. Model Fitting and Forecasting
+
+  
+  # Split the data into train and forecast sets based on missing power_kw
+  forecast_rows <- is.na(df$power_kw)
+  train_df <- df[!forecast_rows, ]
+  forecast_df <- df[forecast_rows, ]
+  
+  # Create time series object for training power data (without NA)
+  ts_train <- ts(train_df$power_kw, frequency = 96, 
+                 start = c(year(min(train_df$timestamp)), 1))
+  
+  # ---- ARIMA (1,0,0) WITHOUT covariates ----
+  fit_arima <- Arima(ts_train, order = c(1,0,0))
+  summary(fit_arima)
+  
+  # Forecast horizon is number of rows in forecast_df
+  h <- nrow(forecast_df)
+  fc_arima <- forecast(fit_arima, h = h)
+  
+  # ---- ARIMAX MODEL with covariates ----
+  # Covariates: temp_c, hour, weekday (as factor), lag_1, lag_96
+  train_df <- train_df %>%
+    mutate(
+      hour = hour(timestamp),
+      weekday = factor(wday(timestamp, label=TRUE, week_start=1)),
+      lag_1 = lag(power_kw, 1),
+      lag_96 = lag(power_kw, 96)
+    )
+  # Remove NA rows caused by lag
+  train_reg <- train_df %>% filter(!is.na(lag_1) & !is.na(lag_96))
+  
+  # Prepare forecast data covariates
+  forecast_df <- forecast_df %>%
+    mutate(
+      hour = hour(timestamp),
+      weekday = factor(wday(timestamp, label=TRUE, week_start=1), 
+                       levels = levels(train_reg$weekday)),
+      # For forecast lags, initially set to NA; will be iteratively filled
+      lag_1 = NA_real_,
+      lag_96 = NA_real_
+    )
+  
+  # --- 1. Fit ARIMAX on training data with xreg ---
+  xreg_train <- model.matrix(~ temp_c + hour + weekday + lag_1 + lag_96, data = train_reg)[, -1]
+  fit_arimax <- Arima(train_reg$power_kw, order = c(1,0,0), xreg = xreg_train)
+  
+  # --- 2. Fit plain ARIMA for comparison ---
+  ts_train <- ts(train_reg$power_kw, frequency = 96, start = c(year(min(train_reg$timestamp)), 1))
+  fit_arima <- Arima(ts_train, order = c(1,0,0))
+  h <- nrow(forecast_df)
+  fc_arima <- forecast(fit_arima, h = h)
+  
+  # --- 3. Iteratively forecast with ARIMAX ---
+  preds_arimax <- numeric(h)
+  last_power <- c(tail(train_reg$power_kw, 96), rep(NA_real_, h))
+  
+  for (i in 1:h) {
+    idx <- length(last_power) - h + i
+    
+    new_row <- forecast_df[i, ]
+    
+    new_row$lag_1 <- last_power[idx - 1]
+    new_row$lag_96 <- last_power[idx - 96]
+    new_row$weekday <- factor(new_row$weekday, levels = levels(train_reg$weekday))
+    
+    new_xreg_raw <- model.matrix(~ temp_c + hour + weekday + lag_1 + lag_96,
+                                 data = new_row,
+                                 contrasts.arg = attr(xreg_train, "contrasts"))[, -1]
+    
+    new_xreg_raw <- as.matrix(new_xreg_raw)
+    
+    align_columns <- function(new_mat, ref_cols) {
+      res <- matrix(0, nrow = nrow(new_mat), ncol = length(ref_cols))
+      colnames(res) <- ref_cols
+      common_cols <- intersect(colnames(new_mat), ref_cols)
+      res[, common_cols] <- new_mat[, common_cols, drop = FALSE]
+      res
+    }
+    
+    new_xreg <- align_columns(new_xreg_raw, colnames(xreg_train))
+    
+    
+    
+    preds_arimax[i] <- forecast(fit_arimax, h = 1, xreg = new_xreg)$mean
+    last_power[idx] <- preds_arimax[i]
+  }
+  
+  # --- 4. Combine forecasts ---
+  forecast_df$pred_arima <- as.numeric(fc_arima$mean)
+  forecast_df$pred_arimax <- preds_arimax
+  
+
+## 8. Forecast Visualization
+
+  
+  # ---- Plot forecasts along with training data ----
+  df_plot_full <- rbind(
+    train_df %>% select(timestamp, power_kw) %>% mutate(type = "Observed"),
+    forecast_df %>% select(timestamp) %>% 
+      mutate(power_kw = NA_real_, type = "Forecast") 
+  )
+  
+  ggplot() + 
+    geom_line(data = train_df, aes(x = timestamp, y = power_kw, color = "Observed")) +
+    geom_line(data = forecast_df, aes(x = timestamp, y = pred_arima, color = "ARIMA Forecast")) +
+    geom_line(data = forecast_df, aes(x = timestamp, y = pred_arimax, color = "ARIMAX Forecast")) +
+    labs(title = "Electricity Load Forecasts",
+         x = "Time",
+         y = "Power (kW)",
+         color = "Legend") +
+    theme_minimal()
+  
+
+## 9. Residual Diagnostics
+
+
+  # Residuals for ARIMA
+  message("=== ARIMA Residual Diagnostics ===")
+  checkresiduals(fit_arima)
+  
+  # Residuals for ARIMAX
+  message("=== ARIMAX Residual Diagnostics ===")
+  res_arimax <- residuals(fit_arimax)
+  par(mfrow = c(2,2))
+  plot(res_arimax, main = "ARIMAX Residuals")
+  acf(res_arimax, main = "ACF of ARIMAX Residuals")
+  pacf(res_arimax, main = "PACF of ARIMAX Residuals")
+  hist(res_arimax, main = "Histogram of ARIMAX Residuals")
+  par(mfrow = c(1,1))
+  print(durbinWatsonTest(lm(res_arimax ~ 1)))  
+
+
+# 10. Export Forecasts to Excel
+
+
+  export_df <- data.frame(
+    ARIMA  = forecast_df$pred_arima[1:96],
+    ARIMAX = forecast_df$pred_arimax[1:96]
+  )
+  write_xlsx(export_df, path = "Forecasts/Abraham_Ibitowa.xlsx")
+  
+  message("Forecasts exported to Forecasts Folder") 
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  

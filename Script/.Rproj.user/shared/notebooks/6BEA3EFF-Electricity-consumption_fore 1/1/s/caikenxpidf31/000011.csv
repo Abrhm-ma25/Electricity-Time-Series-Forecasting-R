@@ -1,0 +1,7 @@
+"0",""
+"0","ggplot(raw, aes(x = Timestamp, y = Power)) +"
+"0","  geom_line(color = ""steelblue"") +"
+"0","  labs(title = ""Full Historical Electricity Consumption"","
+"0","       x = ""Date"","
+"0","       y = ""Power (kW)"") +"
+"0","  theme_minimal()"

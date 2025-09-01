@@ -1,0 +1,32 @@
+{
+    "id": "11B2F64F",
+    "path": "~/Dell/DSTI/13- Time Series Analysis/Elec_Train_Forecast_R/Scripts/Electricity-consumption_forecasts.Rmd",
+    "project_path": "Electricity-consumption_forecasts.Rmd",
+    "type": "r_markdown",
+    "hash": "488847341",
+    "contents": "",
+    "dirty": false,
+    "created": 1756738752411.0,
+    "source_on_save": false,
+    "relative_order": 2,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "rmdVisualMode": "true",
+        "rmdVisualCollapsedChunks": "",
+        "rmdVisualModeLocation": "99:0",
+        "rmdVisualWrapConfigured": "true",
+        "docOutlineVisible": "1",
+        "cursorPosition": "0,0",
+        "scrollLine": "117",
+        "docOutlineSize": "322"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1756740583,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1756740583583,
+    "read_only": false,
+    "read_only_alternatives": []
+}

@@ -1,0 +1,580 @@
+---
+title: "Electricity Consumption Forecasting"
+author: "Ibitowa Abraham"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+------------------------------------------------------------------------
+
+# Project: Electricity Consumption Forecasting
+
+------------------------------------------------------------------------
+
+## Data
+
+-   Timestamp : from '2010-01-01 01:15' to '2010-02-20 23:45'
+-   Power (kW): from '2010-01-01 01:15' to '2010-02-20 23:45'
+-   Temp (C°) : Outdoor temperature available also from '2010-01-01 01:15' to '2010-02-20 23:45' and also for 2010-02-21
+
+------------------------------------------------------------------------
+
+## Goal
+
+Produce a forecast for **2010-02-21** : using the best model tested
+
+## Workflow
+
+### Preprocessing & Feature Engineering
+
+-   Load raw data from Excel and convert timestamps to POSIXct format for proper handling.
+
+-   Handle mixed timestamp formats with conditional parsing.
+
+-   Filter dataset to training period up to '2010-02-20 23:45'.
+
+-   Create time series objects for electricity consumption and temperature with frequency 96 (15-min intervals).
+
+-   Generate calendar-related features such as hour of day, day of week.
+
+-   Compute average daily consumption profiles by 15-min intervals to visualize typical demand cycles.
+
+### Exploration & Visualization
+
+-   Plot average daily consumption pattern to identify baseload, ramps, and peaks.
+
+-   Visualize full historical consumption series for trends, seasonality, and anomalies.
+
+### Modeling
+
+-   Baseline models: Linear Regression with trend plus Fourier seasonal terms, SES, Holt, Holt-Winters additive seasonal model.
+
+-   Statistical models: Auto ARIMA (no regressors), Manual SARIMA tuned for daily seasonality, and SARIMAX including temperature and quadratic temperature terms as external regressors.
+
+-   Machine Learning models: Neural Network Time Series (nnetar) with temperature covariates, and XGBoost using lagged consumption features plus temperature as covariate.
+
+### Validation
+
+-   Perform in-sample validation with comparison against actual values.
+
+### Evaluation Metrics
+
+-   RMSE to measure forecast accuracy.
+
+-   AIC and BIC to quantify model goodness-of-fit (where applicable).
+
+### Deliverable
+
+-   Export forecasts to Excel files named like Model_Forecast_2010_02_21.xlsx.
+
+------------------------------------------------------------------------
+
+# 1) Environment setup
+
+```{r}
+library(readxl)
+library(writexl)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(scales)
+library(ggplot2)
+library(forecast)
+library(stringr)
+library(Metrics)
+library(tibble)
+library(timetk)
+library(xgboost)
+```
+
+# 2) Load & preprocess
+
+```{r}
+excel_path <- 'C:/Users/Abraham/Documents/Dell/DSTI/13- Time Series Analysis/Elec_Train_Forecast_R/Data/2025-06-Elec-train.xlsx'
+  
+raw <- readxl::read_excel(excel_path)
+  
+colnames(raw) <- c("Timestamp", "Power", "Temp")
+
+# Hand modification of the first value in the 'Timestamp' column
+
+raw$Timestamp[1] <- "1/1/2010 1:15"
+
+# Convert from string and numeric formats to POSIXct
+
+raw <- raw %>%
+  mutate(Timestamp = case_when(
+    str_detect(Timestamp, "^[0-9]+(\\.[0-9]+)?$") ~
+       as.POSIXct((as.numeric(Timestamp) - 25569) * 86400,
+                   origin = "1970-01-01", tz = "UTC"),
+    TRUE ~ as.POSIXct(Timestamp, format = "%m/%d/%Y %H:%M", tz = "UTC")
+  ))
+
+# Filter the training data up to cutoff datetime
+
+cutoff <- as.POSIXct("2010-02-20 23:45", tz = "UTC")
+raw_train <- raw %>% filter(Timestamp <= cutoff)
+```
+
+# 3) Feature engineering
+
+```{r}
+# Build time series objects with frequency = 96 (15-min intervals per day)
+
+cons_ts <- ts(raw_train$Power, frequency = 96)
+temp_ts <- ts(raw_train$Temp, frequency = 96)
+
+# Add helper calendar features for day of week, hour of day, and date.
+# Calculate average consumption by 15-min slot across all days.
+
+raw_train <- raw_train %>% mutate( 
+  dow = wday(Timestamp, label = TRUE, week_start = 1), 
+  hod = factor(sprintf("%02d:%02d", hour(Timestamp), minute(Timestamp))), 
+  day = as.Date(Timestamp) )
+
+profile <- raw_train %>% mutate(slot = sprintf("%02d:%02d", hour(Timestamp),
+ minute(Timestamp))) %>% group_by(slot) %>%
+ summarise(AvgPower = mean(Power, na.rm = TRUE), .groups = "drop")
+```
+
+# 4) Visualization: Average daily consumption & full data historic
+
+```{r}
+ggplot(profile, aes(x = as.POSIXct(slot, format = "%H:%M",
+  tz = "UTC"), y = AvgPower)) +
+  geom_line() +
+  labs(
+    title = "Average Daily Consumption Profile",
+    x = "Time of Day",
+    y = "Average kW"
+  ) +
+  scale_x_datetime(
+    breaks = date_breaks("2 hours"), # Graduations tous les 2 heures (à ajuster)
+    labels = date_format("%H:%M"),  # Format des labels heure:minute
+    limits = c(as.POSIXct("00:00", format = "%H:%M", tz = "UTC"),
+               as.POSIXct("23:59", format = "%H:%M", tz = "UTC"))
+    # Limites de l’axe x
+  ) +
+  theme_minimal()
+
+ggplot(raw, aes(x = Timestamp, y = Power)) +
+  geom_line(color = "steelblue") +
+  labs(title = "Full Historical Electricity Consumption",
+       x = "Date",
+       y = "Power (kW)") +
+  theme_minimal()
+```
+
+**Interpretation :**
+
+*Daily consumption (Average by 15-min Slot) :*
+
+*- Overnight Baseload arround 150 KW (00:00 - 05:00) :* This part suggests some essential equipments always-on are running.
+
+*- Morning Ramp-Up (05:00 - 08:00) from arround 150 Kw to 175 KW :* Power Rises, slightly, indicating early- morning activities.
+
+*- Daytime Operation (08:00 - 17:00) :* First Peak arround 250 Kw but the load is remarkably stable all day, in line with the consumption generated by daily activities.
+
+*- Evening Peak (17:00 - 22:00) :* A new peak, at over 300 KW implying energy-intensive nightime processes.
+
+*- Evening Wind-Down (22:00 - 00:00) :* The most significant drop happens just after 22:00, settling back to the overnight baseload by midnight.
+
+-   Overall the time series exhibits a strong, predictable seasonal pattern.
+
+*Full historical electricity consumption :*
+
+-The graph present a dayly seasonality with one unexpected drop on 18 february.
+
+# 5) Baseline models
+
+## 5.1) Linear regression model
+
+```{r}
+# Trend term = simple sequence
+# Fourier terms for seasonality (daily frequency = 96 steps/day)
+
+n <- length(cons_ts)
+
+trend <- 1:n
+
+
+
+K <- 3  # number of Fourier terms
+
+
+fx <- fourier(cons_ts, K = K)
+
+lm_model <- lm(as.numeric(cons_ts) ~ trend + fx)
+
+
+# Compute the evaluation metrics
+
+rmse_lm <- sqrt(mean((cons_ts - fitted(lm_model))^2))
+aic_lm  <- AIC(lm_model)
+bic_lm  <- BIC(lm_model)
+```
+
+## 5.2) SES / Holt / Holt-Winters models
+
+```{r}
+ses_fit <- ses(cons_ts, h = 96)
+holt_fit <- holt(cons_ts, h = 96)
+hw_add <- HoltWinters(cons_ts, seasonal = "additive")
+```
+
+```{r}
+# RMSE computing
+
+rmse_ses  <- sqrt(mean((cons_ts - fitted(ses_fit))^2))
+rmse_holt <- sqrt(mean((cons_ts - fitted(holt_fit))^2))
+rmse_hw   <- sqrt(mean((cons_ts - hw_add$fitted[,1])^2))
+
+# HoltWinters fitted values
+# AIC/BIC: only available directly for lm/arima models
+# We will simply report NA for SES/Holt/HW
+
+aic_ses  <- NA
+bic_ses  <- NA
+aic_holt <- NA
+bic_holt <- NA
+aic_hw   <- NA
+bic_hw   <- NA
+```
+
+## 5.3) Summary of baseline models
+
+```{r}
+cat("Model          RMSE       AIC      BIC\n")
+cat(sprintf("LM Model     : %.3f   %.2f   %.2f\n", rmse_lm, aic_lm, bic_lm))
+cat(sprintf("SES Model    : %.3f   %s      %s\n", rmse_ses, aic_ses, bic_ses))
+cat(sprintf("Holt Model   : %.3f   %s      %s\n", rmse_holt, aic_holt, bic_holt))
+cat(sprintf("HW Additive  : %.3f   %s      %s\n", rmse_hw, aic_hw, bic_hw))
+```
+
+# 6) Statistical models
+
+## 6.1) ARIMA without covariate
+
+```{r}
+arima_auto <- auto.arima(cons_ts,
+                         max.p = 2, max.q = 2,
+                         max.P = 1, max.Q = 1,
+                         seasonal = TRUE,
+                         stepwise = TRUE,
+                         approximation = TRUE)
+
+# the model p,q parameters has been simplyfied given the long length of the time series
+
+```
+
+## 6.2) SARIMA without covariate
+
+```{r}
+sarima <- Arima(cons_ts,
+                       order = c(1,0,1),
+                       seasonal = list(order = c(1,0,1), period = 96))
+```
+
+## 6.3) SARIMAX with Temperature as a covariate
+
+```{r}
+# Build regressors for training
+
+xreg_train <- cbind(
+  Temp  = as.numeric(temp_ts),
+  Temp2 = as.numeric(temp_ts)^2
+)
+
+# Fit SARIMAX with xreg
+
+sarimax_xreg <- auto.arima(
+  cons_ts, 
+  xreg = xreg_train,
+  seasonal = TRUE,
+  stepwise = TRUE,
+  approximation = TRUE
+)
+```
+
+## 6.4) Summary of statistical models
+
+```{r}
+rmse_arima_auto   <- sqrt(mean((cons_ts - fitted(arima_auto))^2))
+rmse_sarima       <- sqrt(mean((cons_ts - fitted(sarima))^2))
+rmse_sarimax_xreg <- sqrt(mean((cons_ts - fitted(sarimax_xreg))^2))
+
+aic_arima_auto <- AIC(arima_auto)
+aic_sarima     <- AIC(sarima)
+aic_sarimax_xreg <- AIC(sarimax_xreg)
+
+bic_arima_auto <- BIC(arima_auto)
+bic_sarima     <- BIC(sarima)
+bic_sarimax_xreg <- BIC(sarimax_xreg)
+
+
+cat(sprintf("ARIMA Auto       : %.3f   %8.1f   %8.1f\n", rmse_arima_auto, aic_arima_auto, bic_arima_auto))
+cat(sprintf("SARIMA Manual    : %.3f   %8.1f   %8.1f\n", rmse_sarima, aic_sarima, bic_sarima))
+cat(sprintf("SARIMAX + Temp   : %.3f   %8.1f   %8.1f\n", rmse_sarimax_xreg, aic_sarimax_xreg, bic_sarimax_xreg))
+```
+
+# 7) ML Models: neural network auto regressive & XGBoost
+
+## 7.1) nnetar
+
+```{r}
+temp_future <- raw$Temp[(nrow(raw_train) + 1):(nrow(raw_train) + 96)]
+
+xreg_train <- cbind(
+  Temp = as.numeric(temp_ts),      # length = length(cons_ts)
+  Temp2 = as.numeric(temp_ts)^2
+)
+
+set.seed(123)
+nnetar_fit <- nnetar(cons_ts, xreg = xreg_train, repeats = 20)
+```
+
+## 7.2) XGBoost with lagged features + Temperature as a covariate
+
+```{r}
+# Build lagged dataset with y (consumption) and Temp
+
+data_xgb <- tk_augment_lags(
+  tibble(
+    y    = as.numeric(cons_ts),
+    Temp = as.numeric(temp_ts)
+  ),
+  .value = y, .lags = 1:24
+)
+
+# Drop NA (due to lags)
+
+data_xgb <- na.omit(data_xgb)
+
+# Train/Test split
+
+n <- nrow(data_xgb)
+train_x <- data_xgb[1:(n-96), -1]  # all predictors
+train_y <- data_xgb$y[1:(n-96)]
+test_x  <- data_xgb[(n-95):n, -1]
+test_y  <- data_xgb$y[(n-95):n]
+
+# Train XGBoost
+
+dtrain <- xgb.DMatrix(data = as.matrix(train_x), label = train_y)
+dtest  <- xgb.DMatrix(data = as.matrix(test_x), label = test_y)
+
+params <- list(
+  objective = "reg:squarederror",
+  eval_metric = "rmse"
+)
+
+xgb_fit <- xgb.train(
+  params = params,
+  data = dtrain,
+  nrounds = 200,
+  watchlist = list(train = dtrain, test = dtest),
+  verbose = 0
+)
+
+# Forecast next 96 steps using temp_future
+# Create future lagged features (last observed values + temp_future)
+
+last_vals <- tail(data_xgb, 24) #last 24 lags
+y_preds   <- numeric(96)            #to store predictions
+lags      <- last_vals$y            #start with last observed y
+
+
+# Generate rolling lags recursively
+y_preds <- numeric(96)
+lags <- last_vals$y
+
+for (i in 1:96) {
+  
+# Build input row: 24 lags + future temp
+  new_obs <- c(tail(lags, 24), temp_future[i])
+  x_new   <- matrix(new_obs, nrow = 1)
+  
+# Predict next value
+  y_new      <- predict(xgb_fit, x_new)
+  y_preds[i] <- y_new
+  
+# Update lags
+  lags <- c(lags, y_new)
+}
+```
+
+## 7.3) Summary of ML models
+
+```{r}
+# nnetar and XGBOOST can not be evaluate with AIC and BIC
+
+# Evaluation NNETAR
+
+idx <- !is.na(fitted(nnetar_fit))
+rmse_nnetar <- rmse(cons_ts[idx], fitted(nnetar_fit)[idx])
+aic_nnetar  <- NA
+bic_nnetar  <- NA
+
+cat(sprintf("NNETAR + Temp    : %.3f   %8s   %8s\n",
+            rmse_nnetar,
+            ifelse(is.na(aic_nnetar),"NA",aic_nnetar),
+            ifelse(is.na(bic_nnetar),"NA",bic_nnetar)))
+
+# Evaluation XGBoost
+
+rmse_xgb <- sqrt(mean((test_y - predict(xgb_fit, as.matrix(test_x)))^2))
+aic_xgb  <- NA
+bic_xgb  <- NA
+
+cat(sprintf("XGBoost + Temp   : %.3f   %8s   %8s\n",
+            rmse_xgb,
+            ifelse(is.na(aic_xgb),"NA",aic_xgb),
+            ifelse(is.na(bic_xgb),"NA",bic_xgb)))
+```
+
+# 8) Summary table of all the metrics evaluations
+
+```{r}
+results <- data.frame(
+  Model = c(
+    "LM Trend+Fourier",
+    "SES",
+    "Holt",
+    "HW Additive",
+    "ARIMA Auto",
+    "SARIMA Manual",
+    "SARIMAX + Temp",
+    "NNETAR + Temp",
+    "XGBoost + Temp"
+  ),
+  RMSE = c(
+    rmse_lm,
+    rmse_ses,
+    rmse_holt,
+    rmse_hw,
+    rmse_arima_auto,
+    rmse_sarima,
+    rmse_sarimax_xreg,
+    rmse_nnetar,
+    rmse_xgb
+  ),
+  AIC = c(
+    aic_lm,
+    NA,
+    NA,
+    NA,
+    aic_arima_auto,
+    aic_sarima,
+    aic_sarimax_xreg,
+    NA,
+    NA
+  ),
+  BIC = c(
+    bic_lm,
+    NA,
+    NA,
+    NA,
+    bic_arima_auto,
+    bic_sarima,
+    bic_sarimax_xreg,
+    NA,
+    NA
+  )
+)
+
+print(results) 
+```
+
+**Comments:**
+
+The comparison table showcases a clear hierarchy in forecasting model performance for electricity consumption.
+
+The linear regression with trend and Fourier terms serves primarily as a baseline and exhibits the highest error, confirming its limited ability to capture the complex dynamics of the data.
+
+Simple exponential smoothing methods, both SES and Holt, improve accuracy somewhat, but still fall short of capturing seasonal and nonlinear patterns. However, The Holt-Winters additive model marks a notable leap in accuracy.
+
+Among classical statistical models, both the auto-selected ARIMA and manually tuned SARIMA demonstrate marked improvements.
+
+The incorporation of temperature as an external regressor in SARIMAX slightly improves performance over ARIMA alone. However, the gain is not dramatic signaling that temperature may have only a modest immediate impact on consumption in this window.
+
+The most striking gains are delivered by machine learning approaches. The NNETAR model, leveraging temperature and its quadratic, yields the lowest RMSE, strongly suggesting that nonlinear, high-capacity models are best equipped to capture the complex, and short-term dependencies in electricity demand.
+
+XGBoost with temperature also outperforms most classical models, reinforcing the advantages of data-driven approaches that incorporate exogenous features.
+
+# 9) Side-by-side visualization of the 4 bests models
+
+```{r}
+last_timestamp <- max(raw_train$Timestamp)
+
+# Generate 96 next 15-min timestamps (for the forecast horizon = 1 day)
+
+timestamps_fc <- seq.POSIXt(from = last_timestamp + 15*60,
+                            by = "15 min",
+                            length.out = 96)
+
+# Extract last 3 days of actual consumption for context in the plot
+
+n_context <- 96*3  # plot last 3 days for context
+last_actuals <- tail(as.numeric(cons_ts), n_context)
+last_actual_timestamps <- tail(raw_train$Timestamp, n_context)
+
+
+hw_fc <- forecast(hw_add, h = 96)
+sarima_fc <- forecast(sarima, h = 96)
+nnetar_fc_day <- forecast(nnetar_fit, xreg = xreg_future, h = 96)$mean
+
+# Combine Actuals + Forecasts into one data frame
+
+plot_df <- tibble(
+  Timestamp = c(last_actual_timestamps, timestamps_fc, timestamps_fc,
+                timestamps_fc, timestamps_fc),
+  
+  Model = factor(rep(c("Actual",
+                       "HW Additive",
+                       "SARIMA Manual",
+                       "XGBoost + Temp",
+                       "NNETAR + Temp"),
+                     times = c(n_context, 96, 96, 96, 96)),
+                 levels = c("Actual", "HW Additive", "SARIMA Manual",
+                             "XGBoost + Temp", "NNETAR + Temp")),
+  Power = c(last_actuals,
+            as.numeric(hw_fc$mean), 
+            # or hw_add_fc$mean based on your result object
+            as.numeric(sarima_fc$mean), 
+            # as above: use your actual SARIMA forecast
+            as.numeric(y_preds),
+            as.numeric(nnetar_fc_day))
+)
+
+ggplot(plot_df, aes(x = Timestamp, y = Power, color = Model, linetype = Model)) +
+  geom_line(size = 1, na.rm = TRUE) +
+  scale_color_manual(
+    values = c("black", "green", "blue", "orange", "purple")
+  ) +
+  scale_linetype_manual(
+    values = c("solid", "dashed", "twodash", "dotdash", "solid")
+  ) +
+  labs(
+    title = "Consumption and Forecasts: HW Additive, SARIMA Manual,
+     XGBoost + Temp, NNETAR + Temp",
+    x = "Timestamp",
+    y = "Power (kW)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "top")
+```
+
+# 10) Export forecasts of the best model according to the metrics evaluation
+
+```{r}
+nnetar_forecast_export <- tibble(
+  Timestamp = timestamps_fc,
+  Power_Forecast = as.numeric(nnetar_fc_day)
+)
+
+export_path <- 'C:/Users/Abraham/Documents/Dell/DSTI/13- Time Series Analysis/Elec_Train_Forecast_R/Forecasts/NNETAR_Forecast_2010_02_21.xlsx'
+
+write_xlsx(nnetar_forecast_export, path = export_path)
+
+cat("NNETAR forecast exported to:", export_path, "\n")
+```

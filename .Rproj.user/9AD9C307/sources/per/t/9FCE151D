@@ -1,0 +1,26 @@
+{
+    "id": "9FCE151D",
+    "path": "~/Dell/DSTI/13- Time Series Analysis/Elec_Train_Forecast_R/Scripts/modeling.R",
+    "project_path": "Scripts/modeling.R",
+    "type": "r_source",
+    "hash": "1624332749",
+    "contents": "",
+    "dirty": false,
+    "created": 1754838756425.0,
+    "source_on_save": false,
+    "relative_order": 2,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "17,27",
+        "scrollLine": "0"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1754856203,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1754856203618,
+    "read_only": false,
+    "read_only_alternatives": []
+}

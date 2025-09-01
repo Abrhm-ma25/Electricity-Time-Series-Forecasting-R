@@ -1,0 +1,53 @@
+### title: "Electricity Forecasting - Abraham Ibitowa"
+
+knitr::opts_chunk \$set(echo = TRUE, warning = FALSE, message = FALSE) library(ggplot2) library(writexl) source("Scripts/preprocessing.R") source("Scripts/modeling.R")
+
+### 1. Data Preprocessing
+
+data_list \<- preprocess_data() train_df \<- data_list$train
+forecast_df <- data_list$forecast
+
+head(train_df) summary(train_df\$power_kw)
+
+------------------------------------------------------------------------
+
+### 2. Visualisations
+
+#### Power Consumption Over Time
+
+ggplot(train_df, aes(x = timestamp, y = power_kw)) + geom_line(color = "steelblue") + labs(title = "Power Consumption Over Time", x = "Timestamp", y = "Power (kW)")
+
+#### Temperature Over Time
+
+ggplot(train_df, aes(x = timestamp, y = temp_c)) + geom_line(color = "darkred") + labs(title = "Outdoor Temperature Over Time", x = "Timestamp", y = "Temperature (°C)")
+
+#### Relationship Between Temperature and Power Consumption
+
+ggplot(train_df, aes(x = temp_c, y = power_kw)) + geom_point(alpha=0.4) + geom_smooth(method = "lm", color = "blue") + labs(title = "Temperature vs. Power Consumption", x = "Temperature (°C)", y = "Power (kW)")
+
+#### Average Daily Pattern
+
+avg_daily \<- train_df %\>% group_by(hour) %\>% summarise(avg_power = mean(power_kw, na.rm=TRUE)) ggplot(avg_daily, aes(x = hour, y = avg_power)) + geom_line(color="purple") + labs(title = "Average Daily Power Usage Pattern", x = "Hour of Day", y = "Average Power (kW)")
+
+------------------------------------------------------------------------
+
+### 3. Model Training and Forecasting
+
+preds \<- model_and_forecast(train_df, forecast_df)
+
+------------------------------------------------------------------------
+
+### 4. Export Predictions
+
+if (!dir.exists("Forecasts")) dir.create("Forecasts") output_df \<- data.frame( Without_Temperature = preds$forecast1,
+With_Temperature = preds$forecast2 ) write_xlsx(output_df, "Forecasts/Abraham_Ibitowa.xlsx")
+
+------------------------------------------------------------------------
+
+### 5. Forecast Visualisation
+
+forecast_df$Forecast1 <- preds$forecast1 forecast_df$Forecast2 <- preds$forecast2
+
+library(tidyr) forecast_long \<- forecast_df %\>% select(timestamp, Forecast1, Forecast2) %\>% pivot_longer(cols = c(Forecast1, Forecast2), names_to = "Model", values_to = "Power")
+
+ggplot(forecast_long, aes(x = timestamp, y = Power, color = Model)) + geom_line() + labs(title = "Electrical Load Forecasts for 21-Feb-2010", y = "Power (kW)", color = "Model")

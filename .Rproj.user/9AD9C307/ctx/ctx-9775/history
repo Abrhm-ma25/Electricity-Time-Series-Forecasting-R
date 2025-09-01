@@ -1,0 +1,319 @@
+source("~/Dell/DSTI/13- Time Series Analysis/Elec_Train_Forecast_R/Scripts/Workfile.R")
+# Return the cleaned dataframe
+return(df)
+# Assuming your table has columns like "DateTime", "Consumption_kW", "Temperature"
+# Adjust column names based on your actual data
+names(df) <- tolower(names(df))  # lowercase column names for consistency
+# scripts/preprocessing.R
+library(readxl)
+library(dplyr)
+library(lubridate)
+preprocess_data <- function() {
+data_path <- "data/2023-11-Elec-train.xlsx"
+df <- read_excel(data_path)
+# Check loaded data
+print(class(df))
+print(head(df))
+# Rename columns to convenient names (lowercase, no spaces)
+df <- df %>%
+rename(
+timestamp = `Timestamp`,
+power_kw = `Power (kW)`,
+temp_c = `Temp (C°)`
+)
+# Convert datetime to POSIXct
+df$datetime <- as.POSIXct(df$datetime, format = "%m/%d/%Y %H:%M", tz = "UTC")
+# Check for missing values
+message("Missing values in dataset: ", sum(is.na(df)))
+# Sort by datetime just in case
+df <- df %>% arrange(datetime)
+# Return cleaned dataframe
+return(df)
+}
+# scripts/preprocessing.R
+library(readxl)
+library(dplyr)
+library(lubridate)
+preprocess_data <- function() {
+data_path <- "data/2023-11-Elec-train.xlsx"
+df <- read_excel(data_path)
+# Check loaded data
+print(class(df))
+print(head(df))
+# Rename columns to convenient names (lowercase, no spaces)
+df <- df %>%
+rename(
+timestamp = `Timestamp`,
+power_kw = `Power (kW)`,
+temp_c = `Temp (C°)`
+)
+# Convert datetime to POSIXct
+df$timestamp <- as.POSIXct(df$timestamp, format = "%m/%d/%Y %H:%M", tz = "UTC")
+# Check for missing values
+message("Missing values in dataset: ", sum(is.na(df)))
+# Sort by datetime just in case
+df <- df %>% arrange(timestamp)
+# Return cleaned dataframe
+return(df)
+}
+# scripts/preprocessing.R
+library(readxl)
+library(dplyr)
+library(lubridate)
+preprocess_data <- function() {
+data_path <- "data/2023-11-Elec-train.xlsx"
+df <- read_excel(data_path)
+# Check loaded data
+print(class(df))
+print(head(df))
+# Rename columns to convenient names (lowercase, no spaces)
+df <- df %>%
+rename(
+timestamp = `Timestamp`,
+power_kw = `Power (kW)`,
+temp_c = `Temp (C°)`
+)
+# Convert datetime to POSIXct
+df$timestamp <- as.POSIXct(df$timestamp, format = "%m/%d/%Y %H:%M", tz = "UTC")
+# Check for missing values
+message("Missing values in dataset: ", sum(is.na(df)))
+# Sort by datetime just in case
+df <- df %>% arrange(timestamp)
+# Return cleaned dataframe
+return(df)
+}
+source("scripts/preprocessing.R") df \<- preprocess_data()
+source("scripts/preprocessing.R") \<- preprocess_data()
+source("scripts/preprocessing.R")
+```
+getwd()
+source("scripts/preprocessing.R")
+source("Scripts/preprocessing.R")
+list.files("scripts")
+source("scripts/Preprocessing.R")
+source("scripts/preprocessing.R")
+source("scripts/preprocessing.R")
+df <- preprocess_data()
+source("scripts/preprocessing.R")
+df <- preprocess_data()
+get wd
+getwd
+setwd("C:/Users/Abraham/Documents/Dell/DSTI/13- Time Series Analysis/Elec_Train_Forecast_R")
+source("Scripts/preprocessing.R")
+df <- preprocess_data()
+# scripts/preprocessing.R
+library(readxl)
+library(dplyr)
+library(lubridate)
+preprocess_data <- function() {
+data_path <- "data/2025-06-Elec-train.xlsx"
+df <- read_excel(data_path)
+# Check loaded data
+print(class(df))
+print(head(df))
+# Rename columns to convenient names (lowercase, no spaces)
+df <- df %>%
+rename(
+timestamp = `Timestamp`,
+power_kw = `Power (kW)`,
+temp_c = `Temp (C°)`
+)
+# Convert datetime to POSIXct
+df$timestamp <- as.POSIXct(df$timestamp, format = "%m/%d/%Y %H:%M", tz = "UTC")
+# Check for missing values
+message("Missing values in dataset: ", sum(is.na(df)))
+# Sort by datetime just in case
+df <- df %>% arrange(timestamp)
+# Return cleaned dataframe
+return(df)
+}
+setwd("C:/Users/Abraham/Documents/Dell/DSTI/13- Time Series Analysis/Elec_Train_Forecast_R")
+source("Scripts/preprocessing.R")
+df <- preprocess_data()
+head(df)
+summary(df)
+library(readxl)
+library(dplyr)
+library(lubridate)
+preprocess_data <- function() {
+data_path <- "data/2025-06-Elec-train.xlsx"   # <-- updated filename
+df <- read_excel(data_path)
+df <- df %>%
+rename(
+timestamp = `Timestamp`,
+power_kw = `Power (kW)`,
+temp_c = `Temp (C°)`
+)
+# Convert Excel numeric dates if needed
+if (is.numeric(df$timestamp[1])) {
+df$timestamp <- as_datetime((df$timestamp - 25569) * 86400, tz = "UTC")
+} else {
+df$timestamp <- as.POSIXct(df$timestamp, format = "%m/%d/%Y %H:%M", tz = "UTC")
+}
+# Missing values info
+message("Missing values: ",
+sum(is.na(df$timestamp)), " in timestamp, ",
+sum(is.na(df$power_kw)), " in power_kw, ",
+sum(is.na(df$temp_c)), " in temp_c")
+df <- df %>% arrange(timestamp)
+return(df)
+}
+setwd("C:/Users/Abraham/Documents/Dell/DSTI/13- Time Series Analysis/Elec_Train_Forecast_R")
+source("Scripts/preprocessing.R")
+df <- preprocess_data()
+head(df)
+summary(df)
+library(readxl)
+library(dplyr)
+library(lubridate)
+library(stringr)
+library(readxl)
+library(dplyr)
+library(lubridate)
+library(stringr)
+install.packages("stringr")
+library(readxl)
+library(dplyr)
+library(lubridate)
+library(stringr)
+preprocess_data <- function() {
+data_path <- "data/2025-06-Elec-train.xlsx"
+df <- read_excel(data_path)
+df <- df %>%
+rename(
+timestamp = `Timestamp`,
+power_kw = `Power (kW)`,
+temp_c = `Temp (C°)`
+)
+# Convert mixed format timestamps
+df <- df %>%
+mutate(timestamp = case_when(
+# If pure numeric (Excel serial), convert using origin 1899-12-30
+str_detect(as.character(timestamp), "^[0-9]+(\\.[0-9]+)?$") ~
+as_datetime((as.numeric(timestamp) - 25569) * 86400, tz = "UTC"),
+# Else parse as character datetime with specified format
+TRUE ~ as.POSIXct(timestamp, format = "%m/%d/%Y %H:%M", tz = "UTC")
+))
+# After conversion, any NAs can be checked
+message("Missing values in timestamp: ", sum(is.na(df$timestamp)))
+message("Missing values in power_kw: ", sum(is.na(df$power_kw)))
+message("Missing values in temp_c: ", sum(is.na(df$temp_c)))
+df <- df %>% arrange(timestamp)
+return(df)
+}
+setwd("C:/Users/Abraham/Documents/Dell/DSTI/13- Time Series Analysis/Elec_Train_Forecast_R")
+source("Scripts/preprocessing.R")
+df <- preprocess_data()
+head(df)
+summary(df)
+library(readxl)
+library(dplyr)
+library(lubridate)
+library(stringr)
+library(zoo)  # for na.approx()
+install.packages("zoo")
+library(readxl)
+library(dplyr)
+library(lubridate)
+library(stringr)
+library(zoo)  # for na.approx()
+preprocess_data <- function() {
+data_path <- "data/2025-06-Elec-train.xlsx"
+df <- read_excel(data_path)
+# Rename columns
+df <- df %>%
+rename(
+timestamp = `Timestamp`,
+power_kw  = `Power (kW)`,
+temp_c    = `Temp (C°)`
+)
+# Convert mixed format timestamps (Excel serial numbers and strings)
+df <- df %>%
+mutate(timestamp = case_when(
+str_detect(as.character(timestamp), "^[0-9]+(\\.[0-9]+)?$") ~
+as_datetime((as.numeric(timestamp) - 25569) * 86400, tz = "UTC"),
+TRUE ~ as.POSIXct(timestamp, format = "%m/%d/%Y %H:%M", tz = "UTC")
+))
+# Sort chronologically
+df <- df %>% arrange(timestamp)
+# Show missing values info
+message("Missing values in timestamp: ", sum(is.na(df$timestamp)))
+message("Missing values in power_kw: ", sum(is.na(df$power_kw)))
+message("Missing values in temp_c: ", sum(is.na(df$temp_c)))
+# Identify forecast rows = last 96 (where power_kw is NA)
+forecast_rows <- is.na(df$power_kw)
+# Separate training set and forecast set
+train_df    <- df[!forecast_rows, ]
+forecast_df <- df[forecast_rows, ]
+# Interpolate missing values in training set only
+train_df <- train_df %>%
+mutate(
+power_kw = na.approx(power_kw, na.rm = FALSE),
+temp_c   = na.approx(temp_c, na.rm = FALSE)
+)
+# Feature engineering function
+add_time_features <- function(data) {
+data %>%
+mutate(
+hour       = hour(timestamp),
+minute     = minute(timestamp),
+weekday    = wday(timestamp, label = TRUE, week_start = 1),
+is_weekend = weekday %in% c("Sat", "Sun"),
+lag_1      = lag(power_kw, 1),
+lag_4      = lag(power_kw, 4),
+lag_96     = lag(power_kw, 96)
+)
+}
+# Apply feature engineering to both sets
+train_df    <- add_time_features(train_df)
+forecast_df <- add_time_features(forecast_df)
+# Return both datasets as a list
+return(list(train = train_df, forecast = forecast_df))
+}
+install.packages("forecast")
+install.packages("dplyr")
+library(forecast)
+library(dplyr)
+model_and_forecast <- function(train_df, forecast_df) {
+# ==========================
+# MODEL 1: ARIMA + Temperature as exogenous variable
+# ==========================
+# Create a time series object for power_kw with 96 intervals/day
+ts_train <- ts(train_df$power_kw, frequency = 96)
+# Fit ARIMA model using temperature as external regressor
+fit_arima <- auto.arima(ts_train, xreg = train_df$temp_c)
+# Forecast for the number of rows in the forecast dataset
+forecast_arima <- forecast(
+fit_arima,
+h = nrow(forecast_df),
+xreg = forecast_df$temp_c
+)
+# Extract numeric forecast values
+preds_arima <- as.numeric(forecast_arima$mean)
+# ==========================
+# MODEL 2: Multiple Linear Regression
+# ==========================
+# We include temperature + temporal features + lags
+# Ensure no NA in lag features for training
+train_reg <- train_df %>% filter(!is.na(lag_1), !is.na(lag_96))
+# Fit linear model
+lm_model <- lm(power_kw ~ temp_c + hour + weekday + lag_1 + lag_96, data = train_reg)
+# Predict values for the forecast period
+preds_lm <- predict(lm_model, newdata = forecast_df)
+# ==========================
+# Return predictions from both models
+# ==========================
+return(list(
+forecast1 = preds_arima,
+forecast2 = preds_lm
+))
+}
+source("scripts/modeling.R")
+# Run preprocessing
+data_list <- preprocess_data()
+source("scripts/modeling.R")
+# Run preprocessing
+data_list <- preprocess_data()
+source("Scripts/modeling.R")
+install.package("ggplot2")
+install.packages("ggplot2")

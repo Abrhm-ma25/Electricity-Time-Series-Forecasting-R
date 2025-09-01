@@ -1,0 +1,3 @@
+"0","ses_fit <- ses(cons_ts, h = 96)"
+"0","holt_fit <- holt(cons_ts, h = 96)"
+"0","hw_add <- HoltWinters(cons_ts, seasonal = ""additive"")"

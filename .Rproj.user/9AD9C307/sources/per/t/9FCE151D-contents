@@ -1,0 +1,53 @@
+library(forecast)
+library(dplyr)
+library(car)  # for residual tests
+
+model_and_forecast <- function(train_df, forecast_df) {
+  
+  # --------------------------
+  # MODEL 1: ARIMA WITHOUT covariates
+  # --------------------------
+  ts_train <- ts(train_df$power_kw, frequency = 96)
+  fit_arima <- auto.arima(ts_train)
+  preds_arima <- as.numeric(forecast(fit_arima, h = nrow(forecast_df))$mean)
+  
+  # Residual diagnostics
+  message("=== ARIMA Residual Diagnostics ===")
+  print(checkresiduals(fit_arima))
+  
+  # --------------------------
+  # MODEL 2: Regression WITH covariates + lags (iterative)
+  # --------------------------
+  # Ensure factor levels match
+  forecast_df$weekday <- factor(forecast_df$weekday, levels = levels(train_df$weekday))
+  
+  train_reg <- train_df %>% filter(!is.na(lag_1), !is.na(lag_96))
+  
+  lm_model <- lm(power_kw ~ temp_c + hour + weekday + lag_1 + lag_96,
+                 data = train_reg)
+  
+  # Linear model residual diagnostics
+  message("=== LM Residual Diagnostics ===")
+  print(summary(lm_model))
+  par(mfrow = c(2,2))
+  plot(lm_model) # residual plots
+  par(mfrow=c(1,1))
+  print(durbinWatsonTest(lm_model)) 
+  
+  # Iterative forecast
+  preds_lm <- numeric(nrow(forecast_df))
+  last_data <- rbind(tail(train_df, 96), forecast_df)
+  
+  for (i in seq_len(nrow(forecast_df))) {
+    idx <- nrow(train_df) + i
+    new_row <- last_data[idx, ]
+    new_row$lag_1 <- last_data$power_kw[idx - 1]
+    new_row$lag_96 <- last_data$power_kw[idx - 96]
+    
+    preds_lm[i] <- predict(lm_model, newdata = new_row)
+    last_data$power_kw[idx] <- preds_lm[i]
+  }
+  
+  list(forecast1 = preds_arima,
+       forecast2 = preds_lm)
+}

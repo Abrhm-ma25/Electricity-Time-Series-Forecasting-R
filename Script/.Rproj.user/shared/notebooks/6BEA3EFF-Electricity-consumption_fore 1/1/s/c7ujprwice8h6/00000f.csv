@@ -1,0 +1,15 @@
+"0","cat(""Model          RMSE       AIC      BIC\n"")"
+"1","Model          RMSE       AIC      BIC
+"
+"0","cat(sprintf(""LM Model     : %.3f   %.2f   %.2f\n"", rmse_lm, aic_lm, bic_lm))"
+"1","LM Model     : 20.710   43543.33   43601.78
+"
+"0","cat(sprintf(""SES Model    : %.3f   %s      %s\n"", rmse_ses, aic_ses, bic_ses))"
+"1","SES Model    : 15.612   NA      NA
+"
+"0","cat(sprintf(""Holt Model   : %.3f   %s      %s\n"", rmse_holt, aic_holt, bic_holt))"
+"1","Holt Model   : 15.613   NA      NA
+"
+"0","cat(sprintf(""HW Additive  : %.3f   %s      %s\n"", rmse_hw, aic_hw, bic_hw))"
+"1","HW Additive  : 9.821   NA      NA
+"

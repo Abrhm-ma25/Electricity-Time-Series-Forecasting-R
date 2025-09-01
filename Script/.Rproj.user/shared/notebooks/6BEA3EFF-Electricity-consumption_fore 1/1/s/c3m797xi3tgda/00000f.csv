@@ -1,0 +1,22 @@
+"0","rmse_arima_auto   <- sqrt(mean((cons_ts - fitted(arima_auto))^2))"
+"0","rmse_sarima       <- sqrt(mean((cons_ts - fitted(sarima))^2))"
+"0","rmse_sarimax_xreg <- sqrt(mean((cons_ts - fitted(sarimax_xreg))^2))"
+"0",""
+"0","aic_arima_auto <- AIC(arima_auto)"
+"0","aic_sarima     <- AIC(sarima)"
+"0","aic_sarimax_xreg <- AIC(sarimax_xreg)"
+"0",""
+"0","bic_arima_auto <- BIC(arima_auto)"
+"0","bic_sarima     <- BIC(sarima)"
+"0","bic_sarimax_xreg <- BIC(sarimax_xreg)"
+"0",""
+"0",""
+"0","cat(sprintf(""ARIMA Auto       : %.3f   %8.1f   %8.1f\n"", rmse_arima_auto, aic_arima_auto, bic_arima_auto))"
+"1","ARIMA Auto       : 11.782    37368.0    37400.4
+"
+"0","cat(sprintf(""SARIMA Manual    : %.3f   %8.1f   %8.1f\n"", rmse_sarima, aic_sarima, bic_sarima))"
+"1","SARIMA Manual    : 8.846    35475.1    35514.1
+"
+"0","cat(sprintf(""SARIMAX + Temp   : %.3f   %8.1f   %8.1f\n"", rmse_sarimax_xreg, aic_sarimax_xreg, bic_sarimax_xreg))"
+"1","SARIMAX + Temp   : 11.590    37218.6    37276.8
+"
