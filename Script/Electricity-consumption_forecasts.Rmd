@@ -183,7 +183,7 @@ ggplot(raw, aes(x = Timestamp, y = Power)) +
 
 *Full historical electricity consumption :*
 
--The graph present a dayly seasonality with one unexpected drop on 18 february.
+-The graph presents a daily seasonality with one unexpected drop on 18 february.
 
 # 5) Baseline models
 
